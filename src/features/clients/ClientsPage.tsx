@@ -105,6 +105,7 @@ export default function ClientsPage() {
                   <th className="px-4 py-3">Nome</th>
                   <th className="px-4 py-3">Telefone</th>
                   <th className="px-4 py-3">Serviços</th>
+                  <th className="px-4 py-3">Bots</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Último contato</th>
                   <th className="px-4 py-3">Próxima tarefa</th>
@@ -123,6 +124,15 @@ export default function ClientsPage() {
                     <td className="px-4 py-3">{c.phone ?? c.whatsapp ?? '—'}</td>
                     <td className="px-4 py-3 text-xs text-slate-600">
                       {(c.services ?? []).join(', ') || '—'}
+                    </td>
+                    <td className="px-4 py-3 text-xs">
+                      {(c.bots_total ?? 0) === 0 ? (
+                        <span className="text-slate-400">—</span>
+                      ) : (c.bots_offline ?? 0) > 0 ? (
+                        <span className="font-semibold text-red-600">🔴 {(c.bots_offline ?? 0)} off / {c.bots_total}</span>
+                      ) : (
+                        <span className="font-semibold text-green-700">🟢 {c.bots_online ?? c.bots_total}/{c.bots_total}</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={c.status} />
@@ -150,6 +160,15 @@ export default function ClientsPage() {
                 </div>
                 <p className="mt-1 text-sm text-slate-600">{c.phone ?? c.whatsapp ?? 'Sem telefone'}</p>
                 <p className="text-xs text-slate-500">{(c.services ?? []).join(', ') || 'Sem serviços'}</p>
+                <p className="mt-1 text-xs">
+                  {(c.bots_total ?? 0) === 0 ? (
+                    <span className="text-slate-400">Sem bots</span>
+                  ) : (c.bots_offline ?? 0) > 0 ? (
+                    <span className="font-semibold text-red-600">🔴 Bot offline</span>
+                  ) : (
+                    <span className="font-semibold text-green-700">🟢 Bot online</span>
+                  )}
+                </p>
               </Card>
             ))}
           </div>

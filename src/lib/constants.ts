@@ -1,4 +1,5 @@
 import type {
+  BotStatus,
   ClientStatus,
   ContactChannel,
   PublicationPlatform,
@@ -78,3 +79,15 @@ export const CLIENT_FILTERS = [
   { value: 'paused', label: 'Pausados' },
   { value: 'closed', label: 'Encerrados' },
 ] as const;
+
+export const BOT_STATUS_LABEL: Record<BotStatus, string> = {
+  online: 'Online',
+  offline: 'Offline',
+  manutencao: 'Em manutenção',
+};
+
+export const BOT_STATUS_BADGE: Record<BotStatus, string> = {
+  online: 'bg-green-100 text-green-800 border-green-200',
+  offline: 'bg-red-100 text-red-800 border-red-200',
+  manutencao: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+};

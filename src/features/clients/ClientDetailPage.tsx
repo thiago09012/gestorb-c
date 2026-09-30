@@ -20,6 +20,7 @@ import {
   Spinner,
   StatusBadge,
   Textarea,
+  BotBadge,
 } from '../../components/ui';
 import { deleteClient, fetchClient } from './api';
 import ClientFormModal from './ClientFormModal';
@@ -30,10 +31,13 @@ import TaskModal from '../tasks/TaskModal';
 import { fetchContactsByClient } from '../contacts/api';
 import ContactModal from '../contacts/ContactModal';
 import { addManualNote, fetchActivityByClient } from '../activity/api';
-import type { ActivityLog, ClientOverview, Contact, Publication, Task } from '../../types/database';
+import { deleteBot, fetchBotsByClient, touchBotNow } from '../bots/api';
+import BotModal from '../bots/BotModal';
+import type { ActivityLog, Bot, ClientOverview, Contact, Publication, Task } from '../../types/database';
 
 const TABS = [
   { value: 'overview', label: 'Visão geral' },
+  { value: 'bots', label: 'Bots' },
   { value: 'publications', label: 'Publicações' },
   { value: 'tasks', label: 'Tarefas' },
   { value: 'history', label: 'Histórico' },
@@ -54,6 +58,7 @@ export default function ClientDetailPage({ initialTab }: { initialTab?: string }
   const [tasks, setTasks] = useState<Task[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [activity, setActivity] = useState<ActivityLog[]>([]);
+  const [bots, setBots] = useState<Bot[]>([]);
 
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
@@ -64,6 +69,9 @@ export default function ClientDetailPage({ initialTab }: { initialTab?: string }
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [confirmTaskId, setConfirmTaskId] = useState<string | null>(null);
+  const [showBotModal, setShowBotModal] = useState(false);
+  const [editingBot, setEditingBot] = useState<Bot | null>(null);
+  const [confirmBotId, setConfirmBotId] = useState<string | null>(null);
   const [showNote, setShowNote] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [nextContact, setNextContact] = useState('');
@@ -80,16 +88,18 @@ export default function ClientDetailPage({ initialTab }: { initialTab?: string }
       }
       setClient(c);
       setNextContact(c.next_contact_at ?? '');
-      const [p, t, ct, a] = await Promise.all([
+      const [p, t, ct, a, b] = await Promise.all([
         fetchPublicationsByClient(id),
         fetchTasksByClient(id),
         fetchContactsByClient(id),
         fetchActivityByClient(id),
+        fetchBotsByClient(id).catch(() => [] as Bot[]),
       ]);
       setPubs(p);
       setTasks(t);
       setContacts(ct);
       setActivity(a);
+      setBots(b);
     } catch (e) {
       notifyError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -123,6 +133,16 @@ export default function ClientDetailPage({ initialTab }: { initialTab?: string }
     try {
       await toggleTaskDone(t);
       push(t.status === 'done' ? 'Tarefa reaberta.' : 'Tarefa concluída!', 'success');
+      load();
+    } catch (e) {
+      notifyError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function handleTestBot(b: Bot) {
+    try {
+      await touchBotNow(b.id);
+      push(`Bot "${b.name}" marcado como online agora.`, 'success');
       load();
     } catch (e) {
       notifyError(e instanceof Error ? e.message : String(e));
@@ -261,6 +281,45 @@ export default function ClientDetailPage({ initialTab }: { initialTab?: string }
               </ul>
             )}
           </Card>
+        </div>
+      )}
+
+      {tab === 'bots' && (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-slate-500">
+              Verde = avisou nos últimos 5 min. Vermelho = desconectado. O bot precisa chamar /rest/v1/rpc/report_bot_heartbeat a cada 2 min.
+            </p>
+            <Button onClick={() => { setEditingBot(null); setShowBotModal(true); }}>+ Novo bot</Button>
+          </div>
+          {bots.length === 0 ? (
+            <EmptyState title="Nenhum bot" hint="Cadastre o bot deste cliente para monitorar se continua conectado." action={<Button onClick={() => setShowBotModal(true)}>+ Novo bot</Button>} />
+          ) : (
+            <div className="grid gap-2">
+              {bots.map((b) => (
+                <Card key={b.id}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium">{b.name}</p>
+                        <BotBadge bot={b} />
+                      </div>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {b.provider}{b.instance_id ? ` · ${b.instance_id}` : ''} · Último sinal: {b.last_seen_at ? formatDateTimeBR(b.last_seen_at) : 'nunca'}
+                      </p>
+                      {b.notes && <p className="mt-1 text-sm text-slate-600">{b.notes}</p>}
+                      <p className="mt-1 font-mono text-[11px] text-slate-400">id: {b.id}</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="secondary" onClick={() => handleTestBot(b)}>Testar agora</Button>
+                      <Button variant="ghost" onClick={() => { setEditingBot(b); setShowBotModal(true); }}><Pencil size={14} /></Button>
+                      <Button variant="ghost" onClick={() => setConfirmBotId(b.id)}><Trash2 size={14} /></Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -416,6 +475,22 @@ export default function ClientDetailPage({ initialTab }: { initialTab?: string }
         />
       )}
       {showTaskModal && <TaskModal fixedClientId={client.id} task={editingTask} onClose={() => { setShowTaskModal(false); setEditingTask(null); }} onSaved={load} />}
+      {showBotModal && <BotModal fixedClientId={client.id} bot={editingBot} onClose={() => { setShowBotModal(false); setEditingBot(null); }} onSaved={load} />}
+      {confirmBotId && (
+        <ConfirmDialog
+          title="Excluir bot"
+          message="Excluir este bot? O monitoramento dele vai parar. Essa ação não pode ser desfeita."
+          onCancel={() => setConfirmBotId(null)}
+          onConfirm={async () => {
+            try {
+              await deleteBot(confirmBotId);
+              push('Bot excluído.', 'success');
+              setConfirmBotId(null);
+              load();
+            } catch (e) { notifyError(e instanceof Error ? e.message : String(e)); }
+          }}
+        />
+      )}
       {confirmTaskId && (
         <ConfirmDialog
           title="Excluir tarefa"

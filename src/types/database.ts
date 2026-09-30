@@ -108,6 +108,21 @@ export interface ActivityLog {
   created_at: string;
 }
 
+export type BotStatus = 'online' | 'offline' | 'manutencao';
+
+export interface Bot {
+  id: string;
+  client_id: string;
+  name: string;
+  provider: string;
+  instance_id: string | null;
+  status: BotStatus;
+  last_seen_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Linha da view client_overview
 export interface ClientOverview extends Client {
   services: string[];
@@ -117,4 +132,8 @@ export interface ClientOverview extends Client {
   next_task_title: string | null;
   next_task_due: string | null;
   last_activity_at: string | null;
+  bots_total?: number | null;
+  bots_online?: number | null;
+  bots_offline?: number | null;
+  last_bot_seen_at?: string | null;
 }

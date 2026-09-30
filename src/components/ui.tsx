@@ -1,6 +1,7 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
-import { CLIENT_STATUS_BADGE, CLIENT_STATUS_LABEL } from '../lib/constants';
-import type { ClientStatus } from '../types/database';
+import { BOT_STATUS_BADGE, BOT_STATUS_LABEL, CLIENT_STATUS_BADGE, CLIENT_STATUS_LABEL } from '../lib/constants';
+import type { Bot, ClientStatus } from '../types/database';
+import { isBotOnline } from '../features/bots/api';
 
 export function Button({
   variant = 'primary',
@@ -62,6 +63,19 @@ export function StatusBadge({ status }: { status: ClientStatus }) {
       className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${CLIENT_STATUS_BADGE[status]}`}
     >
       {dot} {CLIENT_STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+export function BotBadge({ bot }: { bot: Bot }) {
+  const online = isBotOnline(bot);
+  const key = bot.status === 'manutencao' ? 'manutencao' : online ? 'online' : 'offline';
+  const dot = key === 'online' ? '🟢' : key === 'manutencao' ? '🟡' : '🔴';
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${BOT_STATUS_BADGE[key]}`}
+    >
+      {dot} {bot.status === 'manutencao' ? BOT_STATUS_LABEL.manutencao : online ? 'Online' : 'Offline'}
     </span>
   );
 }

@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { supabaseEnvMissing } from '../../lib/supabaseClient';
 import { useToast } from '../../lib/toast';
 import { EnvMissingScreen } from '../../components/ProtectedRoute';
-import { Card, EmptyState, Skeleton, StatusBadge } from '../../components/ui';
-import { formatDateBR, isOverdue, relativeDayLabel } from '../../lib/dates';
+import { Card, EmptyState, Skeleton, StatusBadge, BotBadge } from '../../components/ui';
+import { formatDateBR, formatDateTimeBR, isOverdue, relativeDayLabel } from '../../lib/dates';
 import { TASK_STATUS_LABEL } from '../../lib/constants';
 import {
   contactsDue,
@@ -15,7 +15,8 @@ import {
   fetchWeekPublicationsCount,
   inactiveClients,
 } from './api';
-import type { ActivityLog, ClientOverview, Task } from '../../types/database';
+import { botsOffline, fetchAllBots, isBotOnline } from '../bots/api';
+import type { ActivityLog, Bot, ClientOverview, Task } from '../../types/database';
 
 export default function DashboardPage() {
   const { notifyError } = useToast();
@@ -23,6 +24,7 @@ export default function DashboardPage() {
   const [clients, setClients] = useState<ClientOverview[]>([]);
   const [tasks, setTasks] = useState<(Task & { client_name?: string })[]>([]);
   const [activity, setActivity] = useState<(ActivityLog & { client_name?: string })[]>([]);
+  const [bots, setBots] = useState<(Bot & { client_name?: string })[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [weekPubs, setWeekPubs] = useState(0);
 
@@ -30,18 +32,20 @@ export default function DashboardPage() {
     if (supabaseEnvMissing) return;
     (async () => {
       try {
-        const [c, t, a, pc, wp] = await Promise.all([
+        const [c, t, a, pc, wp, b] = await Promise.all([
           fetchClientOverview(),
           fetchUpcomingTasks(),
           fetchRecentActivity(),
           fetchPendingTasksCount(),
           fetchWeekPublicationsCount(),
+          fetchAllBots().catch(() => [] as (Bot & { client_name?: string })[]),
         ]);
         setClients(c);
         setTasks(t);
         setActivity(a);
         setPendingCount(pc);
         setWeekPubs(wp);
+        setBots(b);
       } catch (e) {
         notifyError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -67,12 +71,16 @@ export default function DashboardPage() {
   const onboarding = clients.filter((c) => c.status === 'onboarding').length;
   const inactive = inactiveClients(clients);
   const due = contactsDue(clients);
+  const offlineBots = botsOffline(bots);
+  const onlineBots = bots.filter((b) => isBotOnline(b)).length;
 
   const cards = [
     { label: 'Total de clientes', value: total },
     { label: 'Ativos', value: active },
     { label: 'Pausados', value: paused },
     { label: 'Em implantação', value: onboarding },
+    { label: 'Bots online', value: onlineBots },
+    { label: 'Bots offline', value: offlineBots.length },
     { label: 'Tarefas pendentes', value: pendingCount },
     { label: 'Publicações da semana', value: weekPubs },
   ];
@@ -167,6 +175,37 @@ export default function DashboardPage() {
             </ul>
           )}
         </Card>
+
+        <Card>
+          <h2 className="font-semibold">Bots desconectados</h2>
+          <p className="text-xs text-slate-500">Sem sinal há mais de 5 minutos. Clique para abrir o cliente.</p>
+          {bots.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500">
+              Nenhum bot cadastrado ainda. Cadastre em Clientes → ficha → aba Bots.
+            </p>
+          ) : offlineBots.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500">Todos os bots online. Bom trabalho!</p>
+          ) : (
+            <ul className="mt-3 flex flex-col gap-2">
+              {offlineBots.slice(0, 10).map((b) => (
+                <li key={b.id} className="flex items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm">
+                  <Link to={`/clientes/${b.client_id}?tab=bots`} className="font-medium hover:underline">
+                    {b.client_name ?? 'Cliente'} · {b.name}
+                  </Link>
+                  <span className="flex items-center gap-2">
+                    <BotBadge bot={b} />
+                    <span className="text-xs text-slate-500">
+                      {b.last_seen_at ? formatDateTimeBR(b.last_seen_at) : 'nunca avisou'}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
 
         <Card>
           <h2 className="font-semibold">Contatos para fazer</h2>

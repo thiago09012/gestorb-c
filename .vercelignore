@@ -1,0 +1,13 @@
+# Não manda pro ar (Vercel) o que é do robô ou pesado.
+# Protege mesmo se um dia copiar a pasta "ChatBot - Projeto 21" pra dentro.
+node_modules
+dist
+auth_info/
+*.pdf
+*.csv
+leads_backup.csv
+.env
+.env.local
+.env.example
+01 - Documentação&Trabalho/
+supabase/seed-demo.sql

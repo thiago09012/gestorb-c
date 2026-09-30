@@ -11,6 +11,14 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.env.local
+
+# Bot (se um dia copiar o ChatBot pra dentro, não vazar segredo nem pesar o git)
+auth_info/
+*.pdf
+*.csv
+leads_backup.csv
 
 # Editor directories and files
 .vscode/*

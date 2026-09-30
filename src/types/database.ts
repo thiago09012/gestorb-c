@@ -121,6 +121,9 @@ export interface Bot {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  qr_code?: string | null;
+  qr_updated_at?: string | null;
+  connection_status?: string | null;
 }
 
 // Linha da view client_overview

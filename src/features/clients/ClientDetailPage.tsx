@@ -33,6 +33,7 @@ import ContactModal from '../contacts/ContactModal';
 import { addManualNote, fetchActivityByClient } from '../activity/api';
 import { deleteBot, fetchBotsByClient, touchBotNow } from '../bots/api';
 import BotModal from '../bots/BotModal';
+import BotQr from '../bots/BotQr';
 import type { ActivityLog, Bot, ClientOverview, Contact, Publication, Task } from '../../types/database';
 
 const TABS = [
@@ -111,6 +112,15 @@ export default function ClientDetailPage({ initialTab }: { initialTab?: string }
   useEffect(() => {
     load();
   }, [load]);
+
+  // Na aba Bots, atualiza sozinho a cada 8s pra pegar QR novo sem F5.
+  useEffect(() => {
+    if (tab !== 'bots' || !id) return;
+    const t = setInterval(() => {
+      fetchBotsByClient(id).then(setBots).catch(() => {});
+    }, 8000);
+    return () => clearInterval(t);
+  }, [tab, id]);
 
   function setTab(v: string) {
     setSearchParams(v === 'overview' ? {} : { tab: v });
@@ -309,6 +319,7 @@ export default function ClientDetailPage({ initialTab }: { initialTab?: string }
                       </p>
                       {b.notes && <p className="mt-1 text-sm text-slate-600">{b.notes}</p>}
                       <p className="mt-1 font-mono text-[11px] text-slate-400">id: {b.id}</p>
+                      <BotQr bot={b} />
                     </div>
                     <div className="flex gap-1">
                       <Button variant="secondary" onClick={() => handleTestBot(b)}>Testar agora</Button>

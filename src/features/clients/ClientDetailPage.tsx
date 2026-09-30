@@ -31,7 +31,7 @@ import TaskModal from '../tasks/TaskModal';
 import { fetchContactsByClient } from '../contacts/api';
 import ContactModal from '../contacts/ContactModal';
 import { addManualNote, fetchActivityByClient } from '../activity/api';
-import { deleteBot, fetchBotsByClient, touchBotNow } from '../bots/api';
+import { deleteBot, fetchBotsByClient, requestBotPing, waitForPong } from '../bots/api';
 import BotModal from '../bots/BotModal';
 import BotQr from '../bots/BotQr';
 import type { ActivityLog, Bot, ClientOverview, Contact, Publication, Task } from '../../types/database';
@@ -73,6 +73,7 @@ export default function ClientDetailPage({ initialTab }: { initialTab?: string }
   const [showBotModal, setShowBotModal] = useState(false);
   const [editingBot, setEditingBot] = useState<Bot | null>(null);
   const [confirmBotId, setConfirmBotId] = useState<string | null>(null);
+  const [verifyingBotId, setVerifyingBotId] = useState<string | null>(null);
   const [showNote, setShowNote] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [nextContact, setNextContact] = useState('');
@@ -149,13 +150,23 @@ export default function ClientDetailPage({ initialTab }: { initialTab?: string }
     }
   }
 
-  async function handleTestBot(b: Bot) {
+  async function handleVerifyBot(b: Bot) {
+    if (verifyingBotId) return;
+    setVerifyingBotId(b.id);
     try {
-      await touchBotNow(b.id);
-      push(`Bot "${b.name}" marcado como online agora.`, 'success');
+      push(`Batendo na porta do "${b.name}"...`, 'success');
+      const requestedAt = await requestBotPing(b.id);
+      const ok = await waitForPong(b.id, requestedAt);
+      if (ok) {
+        push(`🟢 "${b.name}" respondeu agora, está online de verdade.`, 'success');
+      } else {
+        push(`🔴 "${b.name}" não respondeu em 25s. Deve estar desligado.`, 'error');
+      }
       load();
     } catch (e) {
       notifyError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setVerifyingBotId(null);
     }
   }
 
@@ -298,7 +309,7 @@ export default function ClientDetailPage({ initialTab }: { initialTab?: string }
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-slate-500">
-              Verde = avisou nos últimos 5 min. Vermelho = desconectado. O bot precisa chamar /rest/v1/rpc/report_bot_heartbeat a cada 2 min.
+              Verde = avisou nos últimos 5 min. Vermelho = desconectado. O botão Verificar agora bate na porta do robô e espera resposta em ~25s.
             </p>
             <Button onClick={() => { setEditingBot(null); setShowBotModal(true); }}>+ Novo bot</Button>
           </div>
@@ -322,7 +333,13 @@ export default function ClientDetailPage({ initialTab }: { initialTab?: string }
                       <BotQr bot={b} />
                     </div>
                     <div className="flex gap-1">
-                      <Button variant="secondary" onClick={() => handleTestBot(b)}>Testar agora</Button>
+                      <Button
+                        variant="secondary"
+                        disabled={verifyingBotId === b.id}
+                        onClick={() => handleVerifyBot(b)}
+                      >
+                        {verifyingBotId === b.id ? 'Verificando...' : 'Verificar agora'}
+                      </Button>
                       <Button variant="ghost" onClick={() => { setEditingBot(b); setShowBotModal(true); }}><Pencil size={14} /></Button>
                       <Button variant="ghost" onClick={() => setConfirmBotId(b.id)}><Trash2 size={14} /></Button>
                     </div>

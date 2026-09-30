@@ -124,6 +124,8 @@ export interface Bot {
   qr_code?: string | null;
   qr_updated_at?: string | null;
   connection_status?: string | null;
+  pending_command?: string | null;
+  command_requested_at?: string | null;
 }
 
 // Linha da view client_overview

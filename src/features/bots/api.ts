@@ -100,8 +100,50 @@ export async function deleteBot(id: string): Promise<void> {
   if (error) throw err(error, 'Não foi possível excluir o bot.');
 }
 
-/** Marca "testado agora" — atualiza last_seen_at para now() sem mexer no bot real. */
-export async function touchBotNow(id: string): Promise<void> {
-  const { error } = await supabase.from('bots').update({ last_seen_at: new Date().toISOString(), status: 'online' }).eq('id', id);
-  if (error) throw err(error, 'Não foi possível testar o bot.');
+/** Pede ping de verdade: deixa bilhete pro robô responder. Retorna a hora do pedido. */
+export async function requestBotPing(id: string): Promise<string> {
+  const { data, error } = await supabase.rpc('request_bot_ping', { p_bot_id: id });
+  if (error) {
+    if (error.message.includes('request_bot_ping') && (error.message.includes('does not exist') || error.message.includes('function'))) {
+      throw new Error('Ping ainda não ativado. Rode supabase/migrations/007_bots_commands.sql no SQL Editor.');
+    }
+    throw err(error, 'Não foi possível pedir verificação.');
+  }
+  return String(data);
+}
+
+export async function fetchBotById(id: string): Promise<Bot> {
+  const { data, error } = await supabase.from('bots').select('*').eq('id', id).single();
+  if (error) throw err(error, 'Não foi possível recarregar o bot.');
+  return data as Bot;
+}
+
+/**
+ * Espera o pong: o robô responde atualizando last_seen_at e limpando o bilhete.
+ * Considera "respondeu" se last_seen_at ficar maior que a hora do pedido.
+ * Retorna true se respondeu dentro do prazo, false se estourou o tempo.
+ */
+export async function waitForPong(id: string, requestedAtIso: string, timeoutMs = 25000, stepMs = 2000): Promise<boolean> {
+  const requestedAt = new Date(requestedAtIso).getTime();
+  const start = Date.now();
+  // Pequena espera inicial: dá tempo do vigia do robô (10s) ver o bilhete.
+  await new Promise((r) => setTimeout(r, 1500));
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const b = await fetchBotById(id);
+      const seen = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0;
+      // Tolerância de 2s pro relógio: o pong precisa ser do pedido atual, não de antes.
+      if (seen >= requestedAt - 2000 && (b.pending_command === null || b.pending_command === undefined || b.pending_command === '')) {
+        return true;
+      }
+      // Mesmo com bilhete ainda lá, se o ponto é novo, conta como resposta.
+      if (seen >= requestedAt - 2000 && Date.now() - seen < 15000) {
+        return true;
+      }
+    } catch {
+      // ignora erro de rede numa tentativa e continua esperando
+    }
+    await new Promise((r) => setTimeout(r, stepMs));
+  }
+  return false;
 }
